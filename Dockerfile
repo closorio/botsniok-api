@@ -1,17 +1,30 @@
-# Usa una imagen base de Node.js
-FROM node:14
+# Build stage
+FROM node:20-alpine AS builder
 
-# Crea un directorio de trabajo
-WORKDIR /transbot
+WORKDIR /app
 
-# Copia el archivo package.json y package-lock.json al directorio de trabajo
 COPY package*.json ./
+RUN npm ci
 
-# Instala las dependencias del proyecto
-RUN npm install
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
 
-# Copia el resto del código al directorio de trabajo
-COPY . .
+# Production stage
+FROM node:20-alpine
 
-# Define el comando para ejecutar la aplicación
-CMD [ "npm", "start" ]
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+CMD ["node", "dist/server.js"]

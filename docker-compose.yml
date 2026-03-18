@@ -1,7 +1,9 @@
-version: '3.8'
 services:
   telbot:
-    image: dockertransbot:latest
-    environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS}
+    build: .
+    env_file: .env
+    volumes:
+      - ./google_translate_apikey.json:/app/google_translate_apikey.json:ro
+    ports:
+      - "${PORT:-3000}:3000"
+    restart: unless-stopped

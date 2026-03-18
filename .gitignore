@@ -1,4 +1,43 @@
 node_modules
+dist
+
+# Environment
 .env
-igneous-walker-415219-9f156868f8c1.json
-notes.txt
+.env.local
+.env.*.local
+
+# Credentials
+google_translate_apikey.json
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.github/
+.claude/
+.idea/
+*.iml
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Build artifacts
+*.tmp
+.cache/
+.turbo/
+
+# Archives
+*.7z
+
+#???
+whosyourdaddy/
