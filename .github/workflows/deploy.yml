@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to VPS
+        env:
+          SSH_KEY: ~/.ssh/deploy_key
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          API_KEY: ${{ secrets.API_KEY }}
+          AUX_CHANNEL_ID: ${{ secrets.AUX_CHANNEL_ID }}
+          PRIVATE_CHANNEL_IDS: ${{ secrets.PRIVATE_CHANNEL_IDS }}
+          ALLOWED_TELEGRAM_IDS: ${{ secrets.ALLOWED_TELEGRAM_IDS }}
+          GOOGLE_CREDENTIALS_B64: ${{ secrets.GOOGLE_CREDENTIALS_B64 }}
+        run: |
+          ssh -i $SSH_KEY -o StrictHostKeyChecking=no root@$VPS_HOST << 'ENDSSH'
+            set -e
+
+            cd /opt/botsniok-api
+
+            # Pull latest code
+            git pull origin main
+
+            # Create .env file
+            cat > .env << 'ENVEOF'
+          TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+          API_KEY=${{ secrets.API_KEY }}
+          AUX_CHANNEL_ID=${{ secrets.AUX_CHANNEL_ID }}
+          PRIVATE_CHANNEL_IDS=${{ secrets.PRIVATE_CHANNEL_IDS }}
+          ALLOWED_TELEGRAM_IDS=${{ secrets.ALLOWED_TELEGRAM_IDS }}
+          TARGET_LANGUAGE=es
+          PORT=3000
+          NODE_ENV=production
+          LOG_LEVEL=info
+          GOOGLE_APPLICATION_CREDENTIALS=/app/google_translate_apikey.json
+          ENVEOF
+
+            # Decode Google credentials
+            echo '${{ secrets.GOOGLE_CREDENTIALS_B64 }}' | base64 -d > google_translate_apikey.json
+
+            # Build and deploy
+            docker compose down
+            docker compose up --build -d
+
+            # Wait and verify
+            sleep 15
+            if curl -sf http://localhost:3000/health > /dev/null; then
+              echo "✅ Deploy successful - health check passed"
+            else
+              echo "❌ Health check failed"
+              docker compose logs --tail 30
+              exit 1
+            fi
+          ENDSSH
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
