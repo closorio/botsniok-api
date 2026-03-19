@@ -18,7 +18,6 @@ Thumbs.db
 
 # IDE
 .vscode/
-.github/
 .claude/
 .idea/
 *.iml
