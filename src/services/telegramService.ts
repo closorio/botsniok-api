@@ -7,6 +7,18 @@ import type { MediaGroupItem, MediaPayload } from '../types/index.js';
 
 let bot: TelegramBot | null = null;
 
+/**
+ * Parses a channel ID that may include a topic/thread suffix.
+ * Format: "chatId" or "chatId_threadId" (e.g., "-1001972778539_1")
+ */
+function parseChatId(raw: string): { chatId: string; threadId?: number } {
+  const parts = raw.split('_');
+  if (parts.length === 2 && !isNaN(Number(parts[1]))) {
+    return { chatId: parts[0], threadId: Number(parts[1]) };
+  }
+  return { chatId: raw };
+}
+
 export function initializeBot(): TelegramBot {
   bot = new TelegramBot(config.telegramBotToken, { polling: true });
   logger.info('Bot initialized successfully');
@@ -24,23 +36,28 @@ export function isAllowedUser(userId: number): boolean {
   return config.allowedTelegramIds.has(userId);
 }
 
-export async function sendTextMessage(chatId: string, text: string, targetLanguage: string): Promise<void> {
+export async function sendTextMessage(rawChatId: string, text: string, targetLanguage: string): Promise<void> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
   const translatedText = await translateText(text, targetLanguage);
-  await currentBot.sendMessage(chatId, translatedText);
+  await currentBot.sendMessage(chatId, translatedText, {
+    ...(threadId ? { message_thread_id: threadId } : {}),
+  });
 }
 
 export async function sendMedia(
-  chatId: string,
+  rawChatId: string,
   media: MediaPayload,
   caption: string | undefined,
   targetLanguage: string,
   replyMarkup?: TelegramBot.InlineKeyboardMarkup,
 ): Promise<TelegramBot.Message> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
-  const options: TelegramBot.SendPhotoOptions & TelegramBot.SendVideoOptions & TelegramBot.SendDocumentOptions & TelegramBot.SendAnimationOptions & TelegramBot.SendAudioOptions & TelegramBot.SendVoiceOptions = {};
+  const threadOpt = threadId ? { message_thread_id: threadId } : {};
+  const options: Record<string, unknown> = { ...threadOpt };
 
   if (caption) {
     options.caption = await translateText(caption, targetLanguage);
@@ -62,20 +79,21 @@ export async function sendMedia(
   } else if (media.animation) {
     return await currentBot.sendAnimation(chatId, media.animation.file_id, options);
   } else if (media.sticker) {
-    return await currentBot.sendSticker(chatId, media.sticker.file_id);
+    return await currentBot.sendSticker(chatId, media.sticker.file_id, { ...threadOpt });
   } else if (media.video_note) {
-    return await currentBot.sendVideoNote(chatId, media.video_note.file_id);
+    return await currentBot.sendVideoNote(chatId, media.video_note.file_id, { ...threadOpt });
   }
 
   throw new Error('Unknown media type');
 }
 
 export async function sendMediaGroup(
-  chatId: string,
+  rawChatId: string,
   items: MediaGroupItem[],
   targetLanguage: string,
 ): Promise<void> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
 
   const mediaArray: TelegramBot.InputMedia[] = await Promise.all(
@@ -93,32 +111,45 @@ export async function sendMediaGroup(
     }),
   );
 
-  await currentBot.sendMediaGroup(chatId, mediaArray);
+  // @ts-expect-error - message_thread_id is valid but not in type definitions
+  await currentBot.sendMediaGroup(chatId, mediaArray, { ...(threadId ? { message_thread_id: threadId } : {}) });
 }
 
-export async function sendLocation(chatId: string, latitude: number, longitude: number): Promise<void> {
+export async function sendLocation(rawChatId: string, latitude: number, longitude: number): Promise<void> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
-  await currentBot.sendLocation(chatId, latitude, longitude);
+  await currentBot.sendLocation(chatId, latitude, longitude, {
+    ...(threadId ? { message_thread_id: threadId } : {}),
+  });
 }
 
-export async function sendContact(chatId: string, phoneNumber: string, firstName: string, lastName?: string): Promise<void> {
+export async function sendContact(rawChatId: string, phoneNumber: string, firstName: string, lastName?: string): Promise<void> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
-  await currentBot.sendContact(chatId, phoneNumber, firstName, { last_name: lastName });
+  await currentBot.sendContact(chatId, phoneNumber, firstName, {
+    last_name: lastName,
+    ...(threadId ? { message_thread_id: threadId } : {}),
+  });
 }
 
-export async function sendPoll(chatId: string, question: string, pollOptions: string[]): Promise<void> {
+export async function sendPoll(rawChatId: string, question: string, pollOptions: string[]): Promise<void> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
-  await currentBot.sendPoll(chatId, question, pollOptions);
+  await currentBot.sendPoll(chatId, question, pollOptions, {
+    ...(threadId ? { message_thread_id: threadId } : {}),
+  } as TelegramBot.SendPollOptions);
 }
 
-export async function sendAndPinMessage(chatId: string, text: string): Promise<void> {
+export async function sendAndPinMessage(rawChatId: string, text: string): Promise<void> {
   const currentBot = getBot();
+  const { chatId, threadId } = parseChatId(rawChatId);
   await waitForRateLimit(chatId);
   const sentMessage = await currentBot.sendMessage(chatId, text, {
     disable_web_page_preview: false,
+    ...(threadId ? { message_thread_id: threadId } : {}),
   });
   await currentBot.pinChatMessage(chatId, sentMessage.message_id, {
     disable_notification: false,
