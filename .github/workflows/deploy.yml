@@ -74,6 +74,7 @@ jobs:
           NODE_ENV=production
           LOG_LEVEL=info
           GOOGLE_APPLICATION_CREDENTIALS=/app/google_translate_apikey.json
+          SCHEDULED_MESSAGE_TIME=${{ secrets.SCHEDULED_MESSAGE_TIME }}
           ENVEOF
 
             # Decode Google credentials
