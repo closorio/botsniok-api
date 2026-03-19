@@ -86,7 +86,10 @@ jobs:
             # Wait and verify
             sleep 15
             if curl -sf http://localhost:3000/health > /dev/null; then
-              echo "✅ Deploy successful - health check passed"
+              echo "✅ Health check passed"
+              # Start the Telegram bot
+              BOT_API_KEY=$(grep '^API_KEY=' .env | cut -d'=' -f2)
+              curl -sf -X POST -H "X-API-Key: ${BOT_API_KEY}" http://localhost:3000/start-bot && echo "✅ Bot started" || echo "⚠️ Bot start failed"
             else
               echo "❌ Health check failed"
               docker compose logs --tail 30
