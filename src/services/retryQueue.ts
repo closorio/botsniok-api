@@ -2,14 +2,14 @@ import { logger } from '../utils/logger.js';
 import { incrementRetries, incrementRetriesSucceeded, incrementRetriesFailed } from './statsService.js';
 import type { RetryItem } from '../types/index.js';
 
-const MAX_ATTEMPTS = 3;
-const BASE_DELAY_MS = 2000;
+const MAX_ATTEMPTS = 5;
+const BASE_DELAY_MS = 5000;
 const queue: RetryItem[] = [];
 let processingTimer: ReturnType<typeof setInterval> | null = null;
 
 function getBackoffDelay(attempt: number, retryAfter?: number): number {
   if (retryAfter) return retryAfter * 1000;
-  return BASE_DELAY_MS * Math.pow(2, attempt);
+  return BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * BASE_DELAY_MS;
 }
 
 export function isRecoverableError(error: unknown): boolean {
@@ -23,7 +23,12 @@ export function isRecoverableError(error: unknown): boolean {
     message.includes('econnrefused') ||
     message.includes('enetunreach') ||
     message.includes('socket hang up') ||
-    message.includes('network')
+    message.includes('network') ||
+    message.includes('rate limit') ||
+    message.includes('ratelimitexceeded') ||
+    message.includes('resource exhausted') ||
+    message.includes('quota') ||
+    message.includes('circuit breaker')
   );
 }
 

@@ -11,6 +11,8 @@ export interface AppConfig {
   dedupWindowHours: number;
   showInlineButtons: boolean;
   scheduledMessageTime: string;
+  googleTranslateRpm: number;
+  forwardingDelayMs: number;
 }
 
 export interface ApiResponse {
@@ -56,6 +58,9 @@ export interface BotStats {
   retriesSucceeded: number;
   retriesFailed: number;
   duplicatesSkipped: number;
+  googleRateLimitsHit: number;
+  pollingErrors: number;
+  circuitBreakerTrips: number;
   startedAt: number;
 }
 
@@ -70,6 +75,14 @@ export interface RetryItem {
 export interface DeduplicationEntry {
   hash: string;
   timestamp: number;
+}
+
+export interface ForwardingQueueItem {
+  msg: any;
+  privateChannelIds: string[];
+  targetLanguage: string;
+  isMediaGroup?: boolean;
+  mediaGroupItems?: MediaGroupItem[];
 }
 
 export interface VoteCount {

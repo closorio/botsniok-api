@@ -3,9 +3,19 @@ import { config } from '../config/config.js';
 import { translateText } from './translationService.js';
 import { logger } from '../utils/logger.js';
 import { waitForRateLimit } from './rateLimiter.js';
+import { incrementPollingErrors } from './statsService.js';
 import type { MediaGroupItem, MediaPayload } from '../types/index.js';
 
 let bot: TelegramBot | null = null;
+let pollingErrorCount = 0;
+let isRecoveringPolling = false;
+
+const TELEGRAM_CAPTION_LIMIT = 1024;
+
+function truncateCaption(text: string): string {
+  if (text.length <= TELEGRAM_CAPTION_LIMIT) return text;
+  return text.slice(0, TELEGRAM_CAPTION_LIMIT - 3) + '...';
+}
 
 /**
  * Parses a channel ID that may include a topic/thread suffix.
@@ -21,6 +31,33 @@ function parseChatId(raw: string): { chatId: string; threadId?: number } {
 
 export function initializeBot(): TelegramBot {
   bot = new TelegramBot(config.telegramBotToken, { polling: true });
+
+  bot.on('polling_error', (error) => {
+    pollingErrorCount++;
+    incrementPollingErrors();
+    logger.error({ err: error, pollingErrorCount }, 'Telegram polling error');
+
+    if (isRecoveringPolling) return;
+    isRecoveringPolling = true;
+
+    const backoffMs = Math.min(1000 * Math.pow(2, pollingErrorCount), 300_000);
+    logger.warn({ backoffMs, pollingErrorCount }, 'Stopping polling, will restart after backoff');
+
+    bot?.stopPolling();
+    setTimeout(() => {
+      bot?.startPolling();
+      isRecoveringPolling = false;
+      logger.info({ backoffMs }, 'Polling restarted after backoff');
+    }, backoffMs);
+  });
+
+  bot.on('channel_post', () => {
+    if (pollingErrorCount > 0) {
+      logger.info({ previousErrorCount: pollingErrorCount }, 'Polling recovered, resetting error count');
+      pollingErrorCount = 0;
+    }
+  });
+
   logger.info('Bot initialized successfully');
   return bot;
 }
@@ -60,7 +97,8 @@ export async function sendMedia(
   const options: Record<string, unknown> = { ...threadOpt };
 
   if (caption) {
-    options.caption = await translateText(caption, targetLanguage);
+    const translated = await translateText(caption, targetLanguage);
+    options.caption = truncateCaption(translated);
   }
   if (replyMarkup) {
     options.reply_markup = replyMarkup;
@@ -100,7 +138,8 @@ export async function sendMediaGroup(
     items.map(async (item, index) => {
       let caption: string | undefined;
       if (index === 0 && item.caption) {
-        caption = await translateText(item.caption, targetLanguage);
+        const translated = await translateText(item.caption, targetLanguage);
+        caption = truncateCaption(translated);
       }
 
       return {

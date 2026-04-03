@@ -4,6 +4,7 @@ import { stopBot } from './services/telegramService.js';
 import { stopProcessing as stopRetryQueue, getQueueSize } from './services/retryQueue.js';
 import { stopScheduler } from './services/scheduledMessageService.js';
 import { getTranslationCacheSize } from './services/translationService.js';
+import { getForwardingQueueSize } from './services/forwardingQueue.js';
 import { getStats, getUptime } from './services/statsService.js';
 import { getDeduplicationCacheSize } from './services/deduplicationService.js';
 import { apiKeyAuth } from './middleware/auth.js';
@@ -27,6 +28,7 @@ app.get('/health', (_req, res) => {
       uptime: getUptime(),
       translationCacheSize: getTranslationCacheSize(),
       retryQueueSize: getQueueSize(),
+      forwardingQueueSize: getForwardingQueueSize(),
       deduplicationCacheSize: getDeduplicationCacheSize(),
     },
   });

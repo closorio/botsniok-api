@@ -10,6 +10,9 @@ const stats: BotStats = {
   retriesSucceeded: 0,
   retriesFailed: 0,
   duplicatesSkipped: 0,
+  googleRateLimitsHit: 0,
+  pollingErrors: 0,
+  circuitBreakerTrips: 0,
   startedAt: Date.now(),
 };
 
@@ -22,6 +25,9 @@ export function incrementRetries(): void { stats.retriesCount++; }
 export function incrementRetriesSucceeded(): void { stats.retriesSucceeded++; }
 export function incrementRetriesFailed(): void { stats.retriesFailed++; }
 export function incrementDuplicatesSkipped(): void { stats.duplicatesSkipped++; }
+export function incrementGoogleRateLimits(): void { stats.googleRateLimitsHit++; }
+export function incrementPollingErrors(): void { stats.pollingErrors++; }
+export function incrementCircuitBreakerTrips(): void { stats.circuitBreakerTrips++; }
 
 export function getStats(): BotStats {
   return { ...stats };
@@ -48,5 +54,8 @@ export function resetStats(): void {
   stats.retriesSucceeded = 0;
   stats.retriesFailed = 0;
   stats.duplicatesSkipped = 0;
+  stats.googleRateLimitsHit = 0;
+  stats.pollingErrors = 0;
+  stats.circuitBreakerTrips = 0;
   stats.startedAt = Date.now();
 }
