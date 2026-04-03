@@ -47,4 +47,6 @@ export const config: AppConfig = {
   dedupWindowHours: Number(process.env.DEDUP_WINDOW_HOURS) || 24,
   showInlineButtons: process.env.SHOW_INLINE_BUTTONS === 'true',
   scheduledMessageTime: process.env.SCHEDULED_MESSAGE_TIME || '',
+  googleTranslateRpm: Number(process.env.GOOGLE_TRANSLATE_RPM) || 20,
+  forwardingDelayMs: Number(process.env.FORWARDING_DELAY_MS) || 3000,
 };

@@ -1,24 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockSendTextMessage = vi.fn();
-const mockSendMedia = vi.fn();
-const mockSendMediaGroup = vi.fn();
-const mockSendLocation = vi.fn();
-const mockSendContact = vi.fn();
-const mockSendPoll = vi.fn();
 const mockOn = vi.fn();
+const mockAddToForwardingQueue = vi.fn();
 
 vi.mock('../src/services/telegramService.js', () => ({
   getBot: () => ({ on: mockOn }),
-  sendTextMessage: (...args: unknown[]) => mockSendTextMessage(...args),
-  sendMedia: (...args: unknown[]) => mockSendMedia(...args),
-  sendMediaGroup: (...args: unknown[]) => mockSendMediaGroup(...args),
-  sendLocation: (...args: unknown[]) => mockSendLocation(...args),
-  sendContact: (...args: unknown[]) => mockSendContact(...args),
-  sendPoll: (...args: unknown[]) => mockSendPoll(...args),
+  sendTextMessage: vi.fn(),
+  sendMedia: vi.fn(),
+  sendMediaGroup: vi.fn(),
+  sendLocation: vi.fn(),
+  sendContact: vi.fn(),
+  sendPoll: vi.fn(),
   initializeBot: vi.fn(),
   stopBot: vi.fn(),
   isAllowedUser: vi.fn(() => true),
+}));
+
+vi.mock('../src/services/forwardingQueue.js', () => ({
+  addToForwardingQueue: (...args: unknown[]) => mockAddToForwardingQueue(...args),
 }));
 
 vi.mock('../src/handlers/commandHandler.js', () => ({
@@ -73,7 +72,7 @@ describe('MessageHandler', () => {
     expect(mockOn).toHaveBeenCalledWith('channel_post', expect.any(Function));
   });
 
-  it('should forward text messages to all private channels', async () => {
+  it('should enqueue text messages for forwarding', async () => {
     const { forwardChannelPosts } = await import('../src/handlers/messageHandler.js');
     forwardChannelPosts([-100123], ['-100456', '-100789'], 'es');
 
@@ -83,7 +82,14 @@ describe('MessageHandler', () => {
       text: 'Hello world',
     });
 
-    expect(mockSendTextMessage).toHaveBeenCalledTimes(2);
+    expect(mockAddToForwardingQueue).toHaveBeenCalledTimes(1);
+    expect(mockAddToForwardingQueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg: expect.objectContaining({ text: 'Hello world' }),
+        privateChannelIds: ['-100456', '-100789'],
+        targetLanguage: 'es',
+      }),
+    );
   });
 
   it('should ignore messages from other channels', async () => {
@@ -96,10 +102,10 @@ describe('MessageHandler', () => {
       text: 'Should be ignored',
     });
 
-    expect(mockSendTextMessage).not.toHaveBeenCalled();
+    expect(mockAddToForwardingQueue).not.toHaveBeenCalled();
   });
 
-  it('should forward photos with captions', async () => {
+  it('should enqueue photos with captions for forwarding', async () => {
     const { forwardChannelPosts } = await import('../src/handlers/messageHandler.js');
     forwardChannelPosts([-100123], ['-100456'], 'es');
 
@@ -110,20 +116,20 @@ describe('MessageHandler', () => {
       caption: 'A photo',
     });
 
-    expect(mockSendMedia).toHaveBeenCalledWith(
-      '-100456',
-      { photo: { file_id: 'large' } },
-      'A photo',
-      'es',
-      undefined,
+    expect(mockAddToForwardingQueue).toHaveBeenCalledTimes(1);
+    expect(mockAddToForwardingQueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        msg: expect.objectContaining({
+          photo: [{ file_id: 'small' }, { file_id: 'large' }],
+          caption: 'A photo',
+        }),
+        privateChannelIds: ['-100456'],
+        targetLanguage: 'es',
+      }),
     );
   });
 
-  it('should continue processing other channels if one fails', async () => {
-    mockSendMedia
-      .mockRejectedValueOnce(new Error('Channel error'))
-      .mockResolvedValueOnce(undefined);
-
+  it('should enqueue messages even for multiple channels', async () => {
     const { forwardChannelPosts } = await import('../src/handlers/messageHandler.js');
     forwardChannelPosts([-100123], ['-100456', '-100789'], 'es');
 
@@ -134,6 +140,12 @@ describe('MessageHandler', () => {
       caption: 'test',
     });
 
-    expect(mockSendMedia).toHaveBeenCalledTimes(2);
+    // Should enqueue once with both channels (queue handles sequential delivery)
+    expect(mockAddToForwardingQueue).toHaveBeenCalledTimes(1);
+    expect(mockAddToForwardingQueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        privateChannelIds: ['-100456', '-100789'],
+      }),
+    );
   });
 });
