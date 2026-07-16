@@ -78,6 +78,17 @@ app.use(errorHandler);
 
 const server = app.listen(config.port, () => {
   logger.info({ port: config.port }, `Server is running on port ${config.port}`);
+
+  if (config.autoStartBot) {
+    startBot()
+      .then(() => {
+        botRunning = true;
+        logger.info('Bot auto-started');
+      })
+      .catch((error: unknown) => {
+        logger.error({ err: error }, 'Bot auto-start failed, retry with POST /start-bot');
+      });
+  }
 });
 
 // Graceful shutdown

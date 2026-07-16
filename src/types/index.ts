@@ -13,6 +13,7 @@ export interface AppConfig {
   scheduledMessageTime: string;
   googleTranslateRpm: number;
   forwardingDelayMs: number;
+  autoStartBot: boolean;
 }
 
 export interface ApiResponse {

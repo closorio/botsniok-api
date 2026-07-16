@@ -75,6 +75,7 @@ jobs:
           LOG_LEVEL=info
           GOOGLE_APPLICATION_CREDENTIALS=/app/google_translate_apikey.json
           SCHEDULED_MESSAGE_TIME=${{ secrets.SCHEDULED_MESSAGE_TIME }}
+          AUTO_START_BOT=true
           ENVEOF
 
             # Decode Google credentials
@@ -88,9 +89,13 @@ jobs:
             sleep 15
             if curl -sf http://localhost:3000/health > /dev/null; then
               echo "✅ Health check passed"
-              # Start the Telegram bot
-              BOT_API_KEY=$(grep '^API_KEY=' .env | cut -d'=' -f2)
-              curl -sf -X POST -H "X-API-Key: ${BOT_API_KEY}" http://localhost:3000/start-bot && echo "✅ Bot started" || echo "⚠️ Bot start failed"
+              # The bot auto-starts with the server; fall back to /start-bot if it didn't
+              if curl -sf http://localhost:3000/health | grep -q '"botRunning":true'; then
+                echo "✅ Bot running (auto-started)"
+              else
+                BOT_API_KEY=$(grep '^API_KEY=' .env | cut -d'=' -f2)
+                curl -sf -X POST -H "X-API-Key: ${BOT_API_KEY}" http://localhost:3000/start-bot && echo "✅ Bot started" || echo "⚠️ Bot start failed"
+              fi
             else
               echo "❌ Health check failed"
               docker compose logs --tail 30

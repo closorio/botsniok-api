@@ -49,4 +49,5 @@ export const config: AppConfig = {
   scheduledMessageTime: process.env.SCHEDULED_MESSAGE_TIME || '',
   googleTranslateRpm: Number(process.env.GOOGLE_TRANSLATE_RPM) || 20,
   forwardingDelayMs: Number(process.env.FORWARDING_DELAY_MS) || 3000,
+  autoStartBot: process.env.AUTO_START_BOT !== 'false',
 };
